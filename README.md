@@ -61,8 +61,14 @@ export default [
 
 `domain` and `explanation` are optional.
 
-The time limit scales with the number of questions (90 min for 65 on Cloud Practitioner). To override it,
-add `minutes: 60` to the entry. A certificate with no practice exams shows as "Coming soon".
+The time limit scales with the number of questions (90 min for 65 on Cloud Practitioner). To override the
+default for one exam, add `minutes: 60` to the entry — the exam info screen offers that as the preselected
+time, and you can pick another (or no limit at all) before starting. A certificate with no practice exams
+shows as "Coming soon".
+
+Question and answer text stays selectable during the exam, so you can drag over it and copy it (to translate
+it, for example); dragging to select never changes your answer. Each question also has a Copy button, and the
+one on the results page includes the correct answer and explanation.
 
 Past scores are saved in the browser (localStorage).
 

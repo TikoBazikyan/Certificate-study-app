@@ -51,7 +51,7 @@ export default function App() {
             cert={cert}
             exam={exam}
             onBack={toExams}
-            onStart={() => setView({ ...view, step: 'running', startedAt: Date.now() })}
+            onStart={(minutes) => setView({ ...view, step: 'running', minutes, startedAt: Date.now() })}
           />
         )}
         {view.step === 'running' && (
@@ -59,6 +59,7 @@ export default function App() {
             key={view.startedAt}
             cert={cert}
             exam={exam}
+            minutes={view.minutes}
             onQuit={toInfo}
             onFinish={(result) => setView({ ...view, step: 'results', result })}
           />

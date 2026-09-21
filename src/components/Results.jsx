@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { passPercent } from '../data/certificates.js';
-import { formatTime, isCorrect, LETTERS } from '../utils.js';
+import { formatTime, isCorrect, LETTERS, questionToText } from '../utils.js';
+import CopyButton from './CopyButton.jsx';
 
 const FILTERS = [
   ['all', 'All'],
@@ -130,8 +131,14 @@ export default function Results({ cert, exam, result, onRetake, onBackToExams })
               <span>
                 Question {i + 1} {isFlagged && <span className="flag-mark">⚑</span>}
               </span>
-              <span className={`status ${status}`}>
-                {status === 'right' ? '✓ Correct' : status === 'wrong' ? '✗ Incorrect' : '– Unanswered'}
+              <span className="q-meta-right">
+                <span className={`status ${status}`}>
+                  {status === 'right' ? '✓ Correct' : status === 'wrong' ? '✗ Incorrect' : '– Unanswered'}
+                </span>
+                <CopyButton
+                  text={questionToText(q, { includeAnswer: true })}
+                  title="Copy the question, answers and explanation"
+                />
               </span>
             </div>
             <p className="q-text small">{q.question}</p>

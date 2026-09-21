@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { examMinutes } from '../data/certificates.js';
 import { saveResult } from '../progress.js';
-import { formatTime, isCorrect, LETTERS } from '../utils.js';
+import { formatTime, isCorrect, LETTERS, questionToText } from '../utils.js';
+import CopyButton from './CopyButton.jsx';
 
-export default function ExamRunner({ cert, exam, onQuit, onFinish }) {
+export default function ExamRunner({ cert, exam, minutes, onQuit, onFinish }) {
   const { questions } = exam;
-  const limit = examMinutes(cert, exam) * 60;
+  // `minutes` comes from the picker on the exam info screen; null means no time limit.
+  const limit = minutes === null ? null : (minutes ?? examMinutes(cert, exam)) * 60;
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState({}); // question id → picked option indexes
   const [flagged, setFlagged] = useState([]);
-  const [left, setLeft] = useState(limit);
+  const [elapsed, setElapsed] = useState(0);
   const [confirming, setConfirming] = useState(false);
   const done = useRef(false);
+  const pressedAt = useRef(null);
+
+  const left = limit === null ? null : Math.max(0, limit - elapsed);
 
   const q = questions[idx];
   const picked = answers[q.id] ?? [];
@@ -28,7 +33,7 @@ export default function ExamRunner({ cert, exam, onQuit, onFinish }) {
         score,
         total: questions.length,
         percent: Math.round((score / questions.length) * 100),
-        secondsUsed: limit - left,
+        secondsUsed: elapsed,
         timedOut,
         answers,
         flagged,
@@ -36,17 +41,17 @@ export default function ExamRunner({ cert, exam, onQuit, onFinish }) {
       saveResult(cert.id, exam.id, { date: result.date, score, total: result.total, percent: result.percent });
       onFinish(result);
     },
-    [answers, flagged, left, limit, questions, cert.id, exam.id, onFinish],
+    [answers, flagged, elapsed, questions, cert.id, exam.id, onFinish],
   );
 
   useEffect(() => {
-    const t = setInterval(() => setLeft((s) => Math.max(0, s - 1)), 1000);
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
-    if (left === 0) finish(true);
-  }, [left, finish]);
+    if (limit !== null && elapsed >= limit) finish(true);
+  }, [elapsed, limit, finish]);
 
   const choose = useCallback(
     (i) => {
@@ -69,6 +74,19 @@ export default function ExamRunner({ cert, exam, onQuit, onFinish }) {
 
   const go = useCallback((n) => setIdx(Math.min(questions.length - 1, Math.max(0, n))), [questions.length]);
 
+  // Option text is selectable, so a click that was really a drag to select text
+  // (or that left a selection behind) must not change the answer.
+  const startPress = (e) => {
+    pressedAt.current = { x: e.clientX, y: e.clientY };
+  };
+  const wasTextSelection = (e) => {
+    const from = pressedAt.current;
+    pressedAt.current = null;
+    if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 6) return true;
+    const sel = window.getSelection?.();
+    return !!sel && !sel.isCollapsed && sel.toString().trim().length > 0;
+  };
+
   useEffect(() => {
     const onKey = (e) => {
       if (confirming || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -83,7 +101,7 @@ export default function ExamRunner({ cert, exam, onQuit, onFinish }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [q, idx, choose, go, toggleFlag, confirming]);
 
-  const lowTime = left <= 300;
+  const lowTime = left !== null && left <= 300;
 
   return (
     <section className="runner">
@@ -93,7 +111,8 @@ export default function ExamRunner({ cert, exam, onQuit, onFinish }) {
           <span className="muted"> · {cert.code}</span>
         </div>
         <div className={`timer ${lowTime ? 'low' : ''}`} aria-live="polite">
-          ⏱ {formatTime(left)}
+          ⏱ {formatTime(limit === null ? elapsed : left)}
+          {limit === null && <span className="muted"> · no limit</span>}
         </div>
         <div className="muted">
           {answeredCount}/{questions.length} answered
@@ -109,7 +128,10 @@ export default function ExamRunner({ cert, exam, onQuit, onFinish }) {
             <span>
               Question {idx + 1} of {questions.length}
             </span>
-            {q.domain && <span className="pill">{q.domain}</span>}
+            <span className="q-meta-right">
+              {q.domain && <span className="pill">{q.domain}</span>}
+              <CopyButton text={questionToText(q)} />
+            </span>
           </div>
           <h2 className="q-text">{q.question}</h2>
           {multi && <p className="hint">Select {q.answer.length} answers.</p>}
@@ -118,16 +140,24 @@ export default function ExamRunner({ cert, exam, onQuit, onFinish }) {
             {q.options.map((opt, i) => {
               const on = picked.includes(i);
               return (
-                <button
+                <div
                   key={i}
                   role={multi ? 'checkbox' : 'radio'}
                   aria-checked={on}
+                  tabIndex={0}
                   className={`option ${on ? 'on' : ''} ${multi ? 'multi' : ''}`}
-                  onClick={() => choose(i)}
+                  onMouseDown={startPress}
+                  onClick={(e) => !wasTextSelection(e) && choose(i)}
+                  onKeyDown={(e) => {
+                    if (e.key === ' ' || e.key === 'Enter') {
+                      e.preventDefault();
+                      choose(i);
+                    }
+                  }}
                 >
                   <span className="letter">{LETTERS[i]}</span>
-                  <span>{opt}</span>
-                </button>
+                  <span className="opt-text">{opt}</span>
+                </div>
               );
             })}
           </div>
